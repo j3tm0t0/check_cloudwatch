@@ -1,0 +1,81 @@
+#!/bin/sh
+# check_cloudwatch , plugin script to use with Nagios
+# version: 1.2 - arguments changed due to support for multiple regions
+# author: @j3tm0t0
+#
+# pre-requirement: Amazon CloudWatch API Tools installed
+# http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2534&categoryID=88
+#
+# please check README.txt or README-ja.txt for more detail and disclaimer
+#
+
+if [ "$8" = "" ]
+then
+	cat <<EOF
+UNKNOWN: number of arguments is wrong.
+usage: $0 <RegionName> <MeasureName> <statistics> <namespace> <dimensions> <period> <warning> <critical>
+
+ RegionName  : us-east-1, us-west-1...
+ MeasureName : CPUUtilization, FreeableMemory , etc...
+ statistics  : Average , Minimum , Maximum , Sum , etc...
+ namespace   : AWS/EC2 , AWS/RDS , ec...
+ dimensions  : InstanceId=i-xxxxxxxx , ImageId=ami-yyyyyyyy , etc...
+ period      : seconds ( multiply of 60 )
+ warning     : warning threshold
+ critical    : critical threshold
+
+ex: check_cloudwatch us-east-1 CPUUtilization "Average" "AWS/EC2" "InstanceId=i-xxxxxxxx" 360 60 80
+EOF
+	exit 3
+fi
+
+starttime=`date -u +%Y-%m-%dT%H:%M:00 -d "$6 sec ago"`
+endtime=`date -u +%Y-%m-%dT%H:%M:00`
+
+# retrieve data by calling API tool
+RESPONSE=`mon-get-stats "$2" --region "$1" --statistics "$3" --namespace "$4" --dimensions "$5" --start-time $starttime --end-time $endtime --period $6` || ( echo UNKOWN: error to call mon-get-status ; exit 3 )
+VALUE=`echo $RESPONSE | awk '{print $4}'`
+UNIT=`echo $RESPONSE | awk '{print $5}'`
+
+# using in-line perl to compare float values
+export VALUE
+export UNIT
+export MEASURE=$2
+export WARNING=$7
+export CRITICAL=$8
+perl -e '
+if ($ENV{"VALUE"} eq "")
+{
+	print $ENV{'MEASURE'}." UNKNOWN - failed to retrieve data. check arguments.\n";
+	exit 3;
+}
+if ($ENV{"WARNING"} <= $ENV{"CRITICAL"})
+{
+	if ($ENV{"VALUE"} > $ENV{"CRITICAL"})
+	{
+		print $ENV{'MEASURE'}." CRITICAL - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." > ".$ENV{"CRITICAL"}."\n";
+		exit 2;
+	}
+	elsif ($ENV{"VALUE"} > $ENV{"WARNING"})
+	{
+		print $ENV{'MEASURE'}." WARNING - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." > ".$ENV{"WARNING"}."\n";
+		exit 1
+	}
+}
+else
+{
+	if ($ENV{"VALUE"} < $ENV{"CRITICAL"})
+	{
+		print $ENV{'MEASURE'}." CRITICAL - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." < ".$ENV{"CRITICAL"}."\n";
+		exit 2;
+	}
+	elsif ($ENV{"VALUE"} < $ENV{"WARNING"})
+	{
+		print $ENV{'MEASURE'}." WARNING - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." < ".$ENV{"WARNING"}."\n";
+		exit 1
+	}
+}
+print $ENV{'MEASURE'}." OK - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}."\n";
+exit 0;
+'
+exit $?
