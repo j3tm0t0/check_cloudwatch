@@ -1,5 +1,6 @@
 #!/bin/sh
-# check_cloudwatch , plugin script to use with Nagios
+# check_cloudwatch, plugin script to use with Nagios 
+# version: 1.3 - Forced any "Bytes" to return into a human readable format - AllyUnion
 # version: 1.2 - arguments changed due to support for multiple regions
 # author: @j3tm0t0
 #
@@ -29,13 +30,17 @@ EOF
 	exit 3
 fi
 
+source /etc/profile.d/cloudwatch.sh
+
 starttime=`date -u +%Y-%m-%dT%H:%M:00 -d "$6 sec ago"`
 endtime=`date -u +%Y-%m-%dT%H:%M:00`
 
 # retrieve data by calling API tool
-RESPONSE=`mon-get-stats "$2" --region "$1" --statistics "$3" --namespace "$4" --dimensions "$5" --start-time $starttime --end-time $endtime --period $6` || ( echo UNKOWN: error to call mon-get-status ; exit 3 )
-VALUE=`echo $RESPONSE | awk '{print $4}'`
-UNIT=`echo $RESPONSE | awk '{print $5}'`
+#RESPONSE=`mon-get-stats "$2" --region "$1" --statistics "$3" --namespace "$4" --dimensions "$5" --show-empty-fields --start-time $starttime --end-time $endtime --period $6` || ( echo UNKOWN: error to call mon-get-status ; exit 3 )
+RESPONSE=`/opt/third-party/amazon/cloudwatch/bin/mon-get-stats "$2" --region "$1" --statistics "$3" --namespace "$4" --dimensions "$5" --start-time $starttime --end-time $endtime --period $6`
+
+VALUE=`echo $RESPONSE | awk '{print $3}'`
+UNIT=`echo $RESPONSE | awk '{print $4}'`
 
 # using in-line perl to compare float values
 export VALUE
@@ -43,22 +48,51 @@ export UNIT
 export MEASURE=$2
 export WARNING=$7
 export CRITICAL=$8
+
 perl -e '
 if ($ENV{"VALUE"} eq "")
 {
-	print $ENV{'MEASURE'}." UNKNOWN - failed to retrieve data. check arguments.\n";
+	print $ENV{"MEASURE"}." UNKNOWN - failed to retrieve data. check arguments.\n";
 	exit 3;
+}
+@units = ("Bytes", "Kilobytes", "Megabytes", "Gigabytes", "Terabytes", "Petabytes", "Exabytes", "Zettabytes", "Yottabytes");
+$value = $ENV{"VALUE"};
+$unit = $ENV{"UNIT"};
+$unitvalue = 1024;
+if ($ENV{"UNIT"} eq "Bytes")
+{
+        $j = 0;
+        for ($unitvalue = 1024; $unitvalue < $ENV{"VALUE"}; $unitvalue *= 1024) {
+                $j++;
+        }
+        $unitvalue /= 1024;
+	$value = $ENV{"VALUE"} / $unitvalue;
+	$unit = $units[$j];
 }
 if ($ENV{"WARNING"} <= $ENV{"CRITICAL"})
 {
 	if ($ENV{"VALUE"} > $ENV{"CRITICAL"})
 	{
-		print $ENV{'MEASURE'}." CRITICAL - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." > ".$ENV{"CRITICAL"}."\n";
+		if ($ENV{"UNIT"} eq "Bytes")
+		{
+			print $ENV{"MEASURE"}." CRITICAL - $value $unit > ".($ENV{"CRITICAL"} / $unitvalue)."\n";
+		}
+		else
+		{
+			print $ENV{"MEASURE"}." CRITICAL - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." > ".$ENV{"CRITICAL"}."\n";
+		}
 		exit 2;
 	}
 	elsif ($ENV{"VALUE"} > $ENV{"WARNING"})
 	{
-		print $ENV{'MEASURE'}." WARNING - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." > ".$ENV{"WARNING"}."\n";
+		if ($ENV{"UNIT"} eq "Bytes")
+		{
+			print $ENV{"MEASURE"}." WARNING - $value $unit > ".($ENV{"WARNING"} / $unitvalue)."\n";
+		}
+		else
+		{
+			print $ENV{"MEASURE"}." WARNING - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." > ".$ENV{"WARNING"}."\n";
+		}
 		exit 1
 	}
 }
@@ -66,16 +100,37 @@ else
 {
 	if ($ENV{"VALUE"} < $ENV{"CRITICAL"})
 	{
-		print $ENV{'MEASURE'}." CRITICAL - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." < ".$ENV{"CRITICAL"}."\n";
+		if ($ENV{"UNIT"} eq "Bytes")
+		{
+			print $ENV{"MEASURE"}." CRITICAL - $value $unit < ".($ENV{"CRITICAL"} / $unitvalue)."\n";
+		}
+		else
+		{
+			print $ENV{"MEASURE"}." CRITICAL - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." < ".$ENV{"CRITICAL"}."\n";
+		}
 		exit 2;
 	}
 	elsif ($ENV{"VALUE"} < $ENV{"WARNING"})
 	{
-		print $ENV{'MEASURE'}." WARNING - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." < ".$ENV{"WARNING"}."\n";
+		if ($ENV{"UNIT"} eq "Bytes")
+		{
+			print $ENV{"MEASURE"}." WARNING - $value $unit < ".($ENV{"WARNING"} / $unitvalue)."\n";
+		}
+		else
+		{
+			print $ENV{"MEASURE"}." WARNING - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}." < ".$ENV{"WARNING"}."\n";
+		}
 		exit 1
 	}
 }
-print $ENV{'MEASURE'}." OK - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}."\n";
+if ($ENV{"UNIT"} eq "Bytes")
+{
+	print $ENV{"MEASURE"}." OK - $value $unit\n";
+}
+else
+{
+	print $ENV{"MEASURE"}." OK - ".$ENV{"VALUE"}." ".$ENV{"UNIT"}."\n";
+}
 exit 0;
 '
 exit $?
