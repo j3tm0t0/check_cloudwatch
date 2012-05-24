@@ -25,19 +25,25 @@ usage: $0 <RegionName> <MeasureName> <statistics> <namespace> <dimensions> <peri
  warning     : warning threshold
  critical    : critical threshold
 
-ex: check_cloudwatch us-east-1 CPUUtilization "Average" "AWS/EC2" "InstanceId=i-xxxxxxxx" 360 60 80
+ex: check_cloudwatch us-east-1 CPUUtilization "Average" "AWS/EC2" "InstanceId=i-xxxxxxxx" 360 60 80 [-I AWS_ACCESS_KEY -S AWS_SECRET_KEY]
 EOF
 	exit 3
 fi
 
-source /etc/profile.d/cloudwatch.sh
+if [ -f /etc/profile.d/cloudwatch.sh ]; then
+    source /etc/profile.d/cloudwatch.sh
+fi
 
 starttime=`date -u +%Y-%m-%dT%H:%M:00 -d "$6 sec ago"`
 endtime=`date -u +%Y-%m-%dT%H:%M:00`
 
 # retrieve data by calling API tool
-#RESPONSE=`mon-get-stats "$2" --region "$1" --statistics "$3" --namespace "$4" --dimensions "$5" --show-empty-fields --start-time $starttime --end-time $endtime --period $6` || ( echo UNKOWN: error to call mon-get-status ; exit 3 )
-RESPONSE=`/opt/third-party/amazon/cloudwatch/bin/mon-get-stats "$2" --region "$1" --statistics "$3" --namespace "$4" --dimensions "$5" --start-time $starttime --end-time $endtime --period $6`
+COMMAND="mon-get-stats --region \"$1\" --metric-name \"$2\" --statistics \"$3\" --namespace \"$4\" --start-time $starttime --end-time $endtime --period $6"
+if [[ "$5" != "" ]]; then
+    COMMAND="$COMMAND --dimensions \"$5\""
+fi
+shift 6
+RESPONSE=`$COMMAND $@`
 
 VALUE=`echo $RESPONSE | awk '{print $3}'`
 UNIT=`echo $RESPONSE | awk '{print $4}'`
