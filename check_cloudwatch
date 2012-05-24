@@ -42,6 +42,9 @@ COMMAND="mon-get-stats --region \"$1\" --metric-name \"$2\" --statistics \"$3\" 
 if [[ "$5" != "" ]]; then
     COMMAND="$COMMAND --dimensions \"$5\""
 fi
+export MEASURE=$2
+export WARNING=$7
+export CRITICAL=$8
 shift 6
 RESPONSE=`$COMMAND $@`
 
@@ -51,9 +54,6 @@ UNIT=`echo $RESPONSE | awk '{print $4}'`
 # using in-line perl to compare float values
 export VALUE
 export UNIT
-export MEASURE=$2
-export WARNING=$7
-export CRITICAL=$8
 
 perl -e '
 if ($ENV{"VALUE"} eq "")
