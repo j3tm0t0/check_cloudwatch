@@ -21,6 +21,8 @@ If you call the script every 5 mins, you should specify 360 seconds (6 minutes) 
 Call the script or mon-get-stats command directly if you want to adjust parameters.
 
 history
+1.4 - support empty Dimension parameter, allow passing extra arguments
+(such as AWS credentials) to mon-get-stats
 1.3 - made any "Bytes" unit return in a human readable format - allyunion
 1.2 - arguments changed due to support for multiple regions
 1.1 - added support to check thresholds are below than norma state
