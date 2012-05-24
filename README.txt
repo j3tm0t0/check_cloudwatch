@@ -16,8 +16,8 @@ cfg_file=/etc/nagios/objects/aws.cfg
  - register instance to region = Hostgroup
  - add host name to service definitions as needed
 
-tips: 
-If you call the script every 5 mins, you should better specify 360 sec = 6mins as you might not retrive the last minute data.
+Tips: 
+If you call the script every 5 mins, you should specify 360 seconds (6 minutes) as you might not retrieve the last minute's data.
 Call the script or mon-get-stats command directly if you want to adjust parameters.
 
 history
@@ -26,7 +26,7 @@ history
 1.1 - added support to check thresholds are below than norma state
 1.0 - 1st release
 
-Disclaimer
+Disclaimer:
 
 This script is provided as is without any guarantees or warranty. Use it at your own risk.
 
